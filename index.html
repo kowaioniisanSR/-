@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>PHASE BREAKER prototype</title>
+<style>
+:root{--bg:#05080f;--fg:#cfe8ff;--dim:#6d8299;--line:#1b2a3d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+#app{max-width:430px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;gap:8px;padding:8px}
+.top{display:flex;justify-content:space-between;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#0a1220}
+#stage{position:relative;height:190px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#061021;--h:210;--sp:8s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+#stage::before{content:'';position:absolute;inset:0;background-image:linear-gradient(hsla(var(--h),90%,60%,.28) 1px,transparent 1px),linear-gradient(90deg,hsla(var(--h),90%,60%,.28) 1px,transparent 1px);background-size:36px 36px;animation:gridmove var(--sp) linear infinite}
+#stage::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 30%,#05080f 100%)}
+@keyframes gridmove{from{background-position:0 0}to{background-position:0 36px}}
+#stage[data-p=normalA]{--h:210;--sp:9s}
+#stage[data-p=normalB]{--h:175;--sp:7s}
+#stage[data-p=zone]{--h:190;--sp:1.2s}
+#stage[data-p=cz]{--h:350;--sp:3s}
+#stage[data-p=judge]{--h:48;--sp:2s}
+#stage[data-p=bonus]{--h:300;--sp:2s}
+#stage[data-p=at]{--h:45;--sp:.9s}
+#stage[data-p=atjudge]{--h:28;--sp:2s}
+#big,#small{position:relative;z-index:2;text-align:center;text-shadow:0 0 12px hsl(var(--h),90%,60%)}
+#big{font-size:26px;font-weight:700;letter-spacing:.08em}
+#small{font-size:14px;color:#9fc3e6;min-height:20px}
+#flash{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0}
+#flash.w{animation:fw .5s}
+#flash.s{animation:fs .9s}
+#flash.b{animation:fb 1s}
+#flash.p{animation:fp 1.6s}
+@keyframes fw{0%{opacity:.7;background:#9fe}30%{opacity:0;transform:translateX(6px)}60%{opacity:.5;background:#fff;transform:translateX(-6px)}100%{opacity:0}}
+@keyframes fs{0%{opacity:.95;background:#fff}15%{opacity:.2}30%{opacity:.9;background:repeating-linear-gradient(115deg,#fff 0 3px,#fe6 3px 6px)}100%{opacity:0}}
+@keyframes fb{0%,40%,80%{opacity:.8;background:#f23}20%,60%,100%{opacity:0}}
+@keyframes fp{0%{opacity:1;background:#000}85%{opacity:1;background:#000}100%{opacity:0}}
+#reels{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px;border:1px solid var(--line);border-radius:10px;background:#0a1220}
+.col{display:grid;grid-template-rows:repeat(3,1fr);gap:6px}
+.cell{height:58px;border-radius:6px;background:#101c30;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;letter-spacing:.04em;border:1px solid #1e3150}
+.cell.spin{opacity:.55;filter:blur(.6px)}
+.cell[data-s="7"]{color:#ff5a6e}.cell[data-s=BAR]{color:#fff;background:#2a3d5c}.cell[data-s=RP]{color:#6ab7ff}
+.cell[data-s=BELL]{color:#ffd35a}.cell[data-s=CHR]{color:#ff8fd0}.cell[data-s=SUI]{color:#6dff9c}.cell[data-s=RUN]{color:#5ef2ff;text-shadow:0 0 8px #5ef2ff}
+.cell.hit{box-shadow:0 0 10px 1px currentColor}
+#pay{height:22px;text-align:center;font-size:15px;color:#ffd35a}
+#log{height:92px;overflow:auto;font-size:12px;line-height:1.5;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+#log b{color:#ffd35a;font-weight:600}#log i{color:#ff8fd0;font-style:normal}
+#btn{height:84px;border-radius:14px;border:1px solid #2f6fb3;background:linear-gradient(#1b4a82,#0f2d52);color:#fff;font-size:22px;font-weight:700;letter-spacing:.1em}
+#btn:active{filter:brightness(1.4)}
+details{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--dim)}
+details button,details select{background:#0f2d52;color:#fff;border:1px solid #2f6fb3;border-radius:6px;padding:6px 10px;font-size:13px}
+pre{white-space:pre-wrap;font-size:12px;color:#9fc3e6;margin:8px 0 0}
+#stage{height:215px}
+#stage[data-p=czup]{--h:48;--sp:1s}
+#hint{position:relative;z-index:2;font-size:13px;color:#ffd35a;min-height:18px;text-shadow:0 0 8px #000;text-align:center}
+#gaugeWrap{position:relative;z-index:2;width:78%;font-size:11px;color:#9fc3e6;text-align:center}
+#gauge{height:8px;border:1px solid #2f6fb3;border-radius:5px;overflow:hidden;margin-bottom:2px}
+#gauge i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f6fb3,#5ef2ff);transition:width .4s}
+#stage[data-f=white]{box-shadow:inset 0 0 0 3px #fff}
+#stage[data-f=blue]{box-shadow:inset 0 0 0 3px #4aa3ff,inset 0 0 18px #4aa3ff}
+#stage[data-f=rainbow]{animation:rbw 1.2s linear infinite}
+@keyframes rbw{0%,100%{box-shadow:inset 0 0 0 4px #f55,inset 0 0 22px #f55}20%{box-shadow:inset 0 0 0 4px #fd5,inset 0 0 22px #fd5}40%{box-shadow:inset 0 0 0 4px #5f9,inset 0 0 22px #5f9}60%{box-shadow:inset 0 0 0 4px #5bf,inset 0 0 22px #5bf}80%{box-shadow:inset 0 0 0 4px #a5f,inset 0 0 22px #a5f}}
+#crack{position:absolute;inset:0;width:100%;height:100%;z-index:3;opacity:0;pointer-events:none}
+#stage[data-p=judge] #crack{opacity:.8}
+#crack.shatter{animation:shat .7s forwards}
+@keyframes shat{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.7) rotate(4deg)}}
+#card{position:absolute;right:12px;top:12px;width:48px;height:68px;border-radius:6px;z-index:4;display:none;align-items:center;justify-content:center;font-weight:700;font-size:18px;background:#fff;color:#111}
+#card.back{display:flex;background:repeating-linear-gradient(45deg,#1b4a82 0 5px,#0f2d52 5px 10px);color:#8fc;border:2px solid #fff}
+#card.face{display:flex}
+#card.face.BIG{color:#e33}
+#card.face.AT{background:linear-gradient(120deg,#f55,#fd5,#5f9,#5bf,#a5f);color:#fff;font-size:13px}
+#card.flip{animation:flip .5s}
+@keyframes flip{from{transform:rotateY(90deg) scale(.8)}to{transform:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top"><span id="g">G 0</span><span id="ph">通常A</span><span id="coin">COIN 1000</span></div>
+  <div id="stage" data-p="normalA"><div id="big">SYSTEM STABLE</div><div id="small"></div><div id="hint"></div>
+    <div id="gaugeWrap"><div id="gauge"><i></i></div><span id="gtxt"></span></div>
+    <div id="card"></div>
+    <svg id="crack" viewBox="0 0 100 60" preserveAspectRatio="none"><g stroke="#fff" stroke-width=".5" fill="none"><path d="M50 30 L20 5 L8 0 M50 30 L85 8 L96 0 M50 30 L92 40 L100 52 M50 30 L60 60 M50 30 L10 52 L0 58 M50 30 L35 18 L30 0 M50 30 L70 20 L75 10"/></g></svg>
+    <div id="flash"></div></div>
+  <div id="reels"></div>
+  <div id="pay"></div>
+  <div id="log"></div>
+  <button id="btn">LEVER</button>
+  <details>
+    <summary>開発用パネル（内部状態・設定・シミュレーション）</summary>
+    <p id="dbg"></p>
+    <p>設定 <select id="setting"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+    <button id="reset">リセット</button></p>
+    <p><button id="sim">100万G回して数値を見る</button></p>
+    <pre id="simout">数値は下のコード冒頭の CONFIG で変更できます。</pre>
+  </details>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG : 数値はここだけ触ればOK（確率は「1/x」のxを書く）
+   ============================================================ */
+const CONFIG = {
+  bet: 3, startCoins: 1000, setting: 1,
+
+  // 役の出現率（1/x）。小さいほど出やすい
+  roles: {
+    premium: 16000,                                   // 中段チェリー
+    bar: 500,
+    runeStrong: 1800, runeMid: 900, runeWeak: 150,    // ルーン
+    suikaStrong: 450, suikaWeak: 150,
+    cherryStrong: 450, cherryWeak: 150,
+    bellDiag: 6.5,   // 斜めベル 14枚
+    bellSide: 10,    // 横ベル 1枚
+    replay: 7.3
+  },
+  // 払い出し枚数（リプレイはBET返却）
+  payout: { premium: 0, bar: 5, runeStrong: 3, runeMid: 2, runeWeak: 1, suikaStrong: 3, suikaWeak: 2,
+            cherryStrong: 2, cherryWeak: 2, bellDiag: 14, bellSide: 1, replay: 3 },
+
+  // ---- 特化ゾーン ----
+  normalZoneProb: 1/100,    // リプレイ・ベルで5G突入する確率（通常時のみ）
+  zoneFixedG: 5,            // 通常役で当たった時の固定G数
+  zoneAddG: 5,              // ゾーン中のレア役で加算するG数
+  zoneBoost: 2.5,           // ゾーン中のレア役の効果を何倍にするか
+  zoneBarMul: 5,            // ゾーン中のBAR出現率の倍率
+  zoneA_extraG: 2,          // Aのゾーン中は毎G周期をさらに何G進めるか
+  zoneLen: {                // ルーンで当たった時のG数の振り分け [G数, 重み]
+    runeWeak:   [[5,35],[8,25],[10,20],[15,12],[20,6],[30,2]],
+    runeMid:    [[10,20],[15,30],[20,25],[25,15],[30,10]],
+    runeStrong: [[20,20],[25,30],[30,50]]
+  },
+
+  // ---- 通常時 ----
+  cherryA: { weak: 25, strong: 60 },       // Aで周期を何G短縮するか
+  cherryB: { weak: 0.12, strong: 0.35 },   // BでCZに直撃する確率
+  suikaA2B: { weak: 0.15, strong: 0.4 },   // A→B 移行
+  suikaB2A: { weak: 0.10, strong: 0.25 },  // B→A 移行
+  cycleWeights: [[100,10],[200,20],[300,30],[400,20],[500,10],[600,10]],
+  cycleCzToB: 0.3,          // 周期CZ当選時 A→B
+  rareCzToA: 0.3,           // レア役CZ当選時 B→A
+  returnToA: 0.5,           // ボーナス・AT後に通常Aへ戻る割合
+
+  // ---- CZ ----
+  czLen: 8, czNotify: [3, 8],            // CZのG数 / 突破告知のタイミング
+  czUpperProb: 0.1,                       // 上位CZになる割合
+  czPass: { normal: 0.5, upper: 0.9 },
+  // 突破後の初期報酬（設定1と設定6、中間は直線補間）
+  reward1: { REG: 0.55, BIG: 0.425, AT: 0.025 },
+  reward6: { REG: 0.45, BIG: 0.50,  AT: 0.05 },
+  promote: { none: 0.01, weak: 0.5, strong: 0.75 },   // 1Gジャッジ等の昇格率
+
+  premiumAt: 0.05,          // 中段チェリーがAT直撃になる割合（残りはBIG）
+
+  // ---- ボーナス / AT ----
+  bonus: { regG: 5, bigG: 15, payPerG: 13, regAt: 0.05, bigAt: 0.30 },   // 13枚/G=差枚+10
+  at: { setG: 10, extra: 4, continueProb: 0.70, judgeG: 6, rescue: 0.6,
+        addBar: 10, addRareProb: 0.15, addRareG: 3 },
+
+  // ---- 示唆（通常時、何G刻みで出すか） ----
+  hint: { every: 50, truth1: 0.6, truth6: 0.8 }   // 示唆が本当のことを言う確率（設定1→6で上がる）
+};
+
+/* ============================================================
+   ロジック
+   ============================================================ */
+const rnd = () => Math.random();
+const pick = a => a[Math.floor(rnd() * a.length)];
+const randInt = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+function wpick(pairs) {
+  let t = 0; for (const p of pairs) t += p[1];
+  let r = rnd() * t;
+  for (const p of pairs) { if ((r -= p[1]) < 0) return p[0]; }
+  return pairs[pairs.length - 1][0];
+}
+const ROLE_ORDER = ['premium','bar','runeStrong','runeMid','runeWeak','suikaStrong','suikaWeak','cherryStrong','cherryWeak','bellDiag','bellSide','replay'];
+const RARE = new Set(['cherryWeak','cherryStrong','suikaWeak','suikaStrong','runeWeak','runeMid','runeStrong']);
+const LABEL = { premium:'中段チェリー', bar:'BAR揃い', runeStrong:'ルーン強', runeMid:'ルーン中', runeWeak:'ルーン弱',
+  suikaStrong:'スイカ強', suikaWeak:'スイカ弱', cherryStrong:'チェリー強', cherryWeak:'チェリー弱',
+  bellDiag:'ベル(斜め14枚)', bellSide:'ベル(横1枚)', replay:'リプレイ', miss:'ハズレ' };
+
+let TABLE = { n: [], z: [] };
+function rebuildTables() {
+  for (const key of ['n', 'z']) {
+    let acc = 0; const t = [];
+    for (const r of ROLE_ORDER) {
+      let p = 1 / CONFIG.roles[r];
+      if (key === 'z' && r === 'bar') p *= CONFIG.zoneBarMul;
+      acc += p; t.push([r, acc]);
+    }
+    TABLE[key] = t;
+  }
+}
+rebuildTables();
+function drawRole(inZone) {
+  const u = rnd();
+  for (const [r, c] of TABLE[inZone ? 'z' : 'n']) if (u < c) return r;
+  return 'miss';
+}
+const drawCycle = () => wpick(CONFIG.cycleWeights);
+
+function newState(setting) {
+  const s = { setting: setting || CONFIG.setting, phase: 'normal', mode: 'A', cycleG: 0, cycleTarget: 0,
+    zone: 0, nsince: 0, cz: null, bonus: null, at: null, atj: null, coins: CONFIG.startCoins,
+    st: { games:0, normalGames:0, bet:0, paid:0, czCycle:0, czRare:0, czUpper:0, czPass:0, reg:0, big:0, atDirect:0,
+          atStart:0, atSets:0, zoneEntries:0, zoneGames:0, zoneByRune:0, bars:0, rare:0 } };
+  s.cycleTarget = drawCycle();
+  return s;
+}
+function rewardTable(setting) {
+  const t = (setting - 1) / 5, a = CONFIG.reward1, b = CONFIG.reward6;
+  return [['REG', a.REG + (b.REG - a.REG) * t], ['BIG', a.BIG + (b.BIG - a.BIG) * t], ['AT', a.AT + (b.AT - a.AT) * t]];
+}
+function promoteProb(role) {
+  if (role === 'bar' || role === 'premium') return 1;
+  if (role === 'cherryStrong' || role === 'suikaStrong' || role === 'runeMid' || role === 'runeStrong') return CONFIG.promote.strong;
+  if (RARE.has(role)) return CONFIG.promote.weak;
+  return CONFIG.promote.none;
+}
+const up = r => r === 'REG' ? 'BIG' : 'AT';
+
+function enterCZ(s, kind, ev) {
+  const C = CONFIG, upper = rnd() < C.czUpperProb, pass = rnd() < (upper ? C.czPass.upper : C.czPass.normal);
+  s.cz = { kind, upper, pass, g: 0, noticed: false, notifyAt: pass ? randInt(C.czNotify[0], C.czNotify[1]) : 0,
+           reward: pass ? wpick(rewardTable(s.setting)) : null };
+  s.phase = 'cz'; s.zone = 0;
+  s.st[kind === 'cycle' ? 'czCycle' : 'czRare']++; if (upper) s.st.czUpper++;
+  ev.push({ t: (upper ? '上位' : '') + 'CZ突入（' + (kind === 'cycle' ? '周期' : 'レア役') + '）', c: 'hot' });
+  if (kind === 'cycle' && s.mode === 'A' && rnd() < C.cycleCzToB) { s.mode = 'B'; ev.push({ t: 'モード移行 A→B', c: 'sys' }); }
+  else if (kind === 'rare' && s.mode === 'B' && rnd() < C.rareCzToA) { s.mode = 'A'; ev.push({ t: 'モード移行 B→A', c: 'sys' }); }
+}
+function toNormal(s) {
+  s.phase = 'normal'; s.mode = rnd() < CONFIG.returnToA ? 'A' : 'B';
+  s.cycleG = 0; s.cycleTarget = drawCycle(); s.zone = 0; s.nsince = 0; s.cz = null; s.bonus = null; s.at = null; s.atj = null;
+}
+function startAT(s, ev, direct) {
+  s.phase = 'at'; s.at = { left: CONFIG.at.setG, sets: 1 };
+  s.st.atStart++; s.st.atSets++; if (direct) s.st.atDirect++;
+  ev.push({ t: 'AT開始！', c: 'hot' });
+}
+function startBonus(s, type, ev) {
+  if (type === 'AT') { startAT(s, ev, true); return; }
+  s.phase = 'bonus'; s.bonus = { type, left: type === 'REG' ? CONFIG.bonus.regG : CONFIG.bonus.bigG, atWin: false };
+  s.st[type.toLowerCase()]++;
+  ev.push({ t: type + ' 開始', c: 'hot' });
+}
+
+function normalGame(s, role, inZone, ev) {
+  const C = CONFIG, boost = inZone ? C.zoneBoost : 1, strong = /Strong$/.test(role);
+  let czNow = null; s.nsince++;
+  if (RARE.has(role) || role === 'bar') s.st.rare++;
+  if (role === 'premium') { startBonus(s, rnd() < C.premiumAt ? 'AT' : 'BIG', ev); return; }
+  if (role === 'bar') { czNow = 'rare'; s.st.bars++; ev.push({ t: 'BAR揃い → CZ確定', c: 'hot' }); }
+  else if (role.startsWith('cherry')) {
+    if (s.mode === 'A') {
+      const g = (strong ? C.cherryA.strong : C.cherryA.weak) * boost; s.cycleG += g;
+      ev.push({ t: 'チェリー：周期 ' + Math.round(g) + 'G短縮', c: 'sys' });
+    } else if (rnd() < Math.min(1, (strong ? C.cherryB.strong : C.cherryB.weak) * boost)) czNow = 'rare';
+  } else if (role.startsWith('suika')) {
+    const p = (s.mode === 'A' ? C.suikaA2B : C.suikaB2A)[strong ? 'strong' : 'weak'] * boost;
+    if (rnd() < Math.min(1, p)) { s.mode = s.mode === 'A' ? 'B' : 'A'; ev.push({ t: 'スイカ：モード移行 → ' + s.mode, c: 'sys' }); }
+  } else if (role.startsWith('rune')) {
+    if (!inZone) { s.zone = wpick(C.zoneLen[role]); s.st.zoneEntries++; s.st.zoneByRune++; ev.push({ t: 'ルーン：特化ゾーン ' + s.zone + 'G', c: 'hot' }); }
+  } else if (role === 'replay' || role.startsWith('bell')) {
+    if (!inZone && rnd() < C.normalZoneProb) { s.zone = C.zoneFixedG; s.st.zoneEntries++; ev.push({ t: '通常役：特化ゾーン ' + C.zoneFixedG + 'G', c: 'hot' }); }
+  }
+  if (inZone) {
+    if (RARE.has(role) || role === 'bar') { s.zone += C.zoneAddG; ev.push({ t: 'ゾーン +' + C.zoneAddG + 'G', c: 'hot' }); }
+    if (s.mode === 'A') s.cycleG += C.zoneA_extraG;
+    s.zone--; s.st.zoneGames++;
+    if (s.zone <= 0) ev.push({ t: '特化ゾーン終了', c: 'sys' });
+  }
+  if (s.mode === 'A') { s.cycleG += 1; if (!czNow && s.cycleG >= s.cycleTarget) czNow = 'cycle'; }
+  if (czNow) enterCZ(s, czNow, ev);
+}
+function czGame(s, role, ev) {
+  const z = s.cz; z.g++;
+  if (z.pass && !z.noticed) {
+    if (rnd() < promoteProb(role) && z.reward !== 'AT') { z.reward = up(z.reward); ev.push({ t: '報酬が昇格…？', c: 'sys' }); }
+    if (z.g >= z.notifyAt) { z.noticed = true; s.st.czPass++; s.phase = 'judge'; ev.push({ t: 'CZ突破！ 1Gジャッジ', c: 'hot' }); }
+  } else if (!z.pass && z.g >= CONFIG.czLen) {
+    ev.push({ t: 'CZ失敗', c: 'sys' }); toNormalKeepMode(s);
+  }
+}
+function toNormalKeepMode(s) { const m = s.mode; toNormal(s); s.mode = m; }
+function judgeGame(s, role, ev) {
+  let r = s.cz.reward;
+  if (r !== 'AT' && rnd() < promoteProb(role)) { r = up(r); ev.push({ t: '昇格！', c: 'hot' }); }
+  s.cz = null; startBonus(s, r, ev);
+}
+function bonusGame(s, role, ev) {
+  const b = s.bonus; b.left--;
+  if (role === 'bar' || role === 'premium') { b.atWin = true; }
+  if (b.left <= 0) {
+    const p = b.type === 'BIG' ? CONFIG.bonus.bigAt : CONFIG.bonus.regAt;
+    if (b.atWin || rnd() < p) startAT(s, ev, false); else { ev.push({ t: 'ボーナス終了', c: 'sys' }); toNormal(s); }
+  }
+}
+function atGame(s, role, ev) {
+  const a = s.at, C = CONFIG.at; a.left--;
+  if (role === 'bar') { a.left += C.addBar; ev.push({ t: 'BAR！ 上乗せ +' + C.addBar + 'G', c: 'hot' }); }
+  else if (RARE.has(role) && rnd() < C.addRareProb) { a.left += C.addRareG; ev.push({ t: '上乗せ +' + C.addRareG + 'G', c: 'hot' }); }
+  if (a.left <= 0) { s.phase = 'atjudge'; s.atj = { g: 0, ok: rnd() < C.continueProb }; ev.push({ t: '継続ジャッジ', c: 'sys' }); }
+}
+function atjudgeGame(s, role, ev) {
+  const j = s.atj, C = CONFIG.at; j.g++;
+  if (!j.ok && (RARE.has(role) || role === 'bar') && rnd() < C.rescue) { j.ok = true; ev.push({ t: '逆転！ 継続', c: 'hot' }); }
+  if (j.g >= C.judgeG) {
+    if (j.ok) { s.phase = 'at'; s.at.left = C.setG; s.at.sets++; s.st.atSets++; ev.push({ t: 'AT継続！ SET' + s.at.sets, c: 'hot' }); }
+    else { ev.push({ t: 'AT終了', c: 'sys' }); toNormal(s); }
+  }
+}
+
+function playGame(s) {
+  const C = CONFIG, ev = [], ph = s.phase, inZone = ph === 'normal' && s.zone > 0;
+  const role = drawRole(inZone);
+  let pay = ph === 'bonus' ? C.bonus.payPerG : (C.payout[role] || 0);
+  if (ph === 'at') pay += C.at.extra;
+  s.st.games++; s.st.bet += C.bet; s.st.paid += pay; s.coins += pay - C.bet;
+  if (ph === 'normal' || ph === 'cz' || ph === 'judge') s.st.normalGames++;
+  if (ph === 'normal') normalGame(s, role, inZone, ev);
+  else if (ph === 'cz') czGame(s, role, ev);
+  else if (ph === 'judge') judgeGame(s, role, ev);
+  else if (ph === 'bonus') bonusGame(s, role, ev);
+  else if (ph === 'at') atGame(s, role, ev);
+  else if (ph === 'atjudge') atjudgeGame(s, role, ev);
+  return { role, pay, ev, phaseBefore: ph };
+}
+
+function simulate(n, setting) {
+  const s = newState(setting); s.coins = 0;
+  for (let i = 0; i < n; i++) playGame(s);
+  const t = s.st, hits = t.reg + t.big + t.atDirect;
+  return {
+    '機械割': (t.paid / t.bet * 100).toFixed(1) + '%',
+    '初当たり(REG/BIG/AT直)': hits ? '1/' + Math.round(t.normalGames / hits) + 'G' : '-',
+    'CZ(周期/レア役)': (t.czCycle + t.czRare ? '1/' + Math.round(t.normalGames / (t.czCycle + t.czRare)) + 'G' : '-') + `（周期${t.czCycle}回 レア${t.czRare}回 上位${t.czUpper}回）`,
+    'CZ突破率': t.czCycle + t.czRare ? (t.czPass / (t.czCycle + t.czRare) * 100).toFixed(1) + '%' : '-',
+    '特化ゾーン突入': t.zoneEntries ? '1/' + Math.round(t.normalGames / t.zoneEntries) + 'G' : '-',
+    'ゾーン平均G(延長込み)': t.zoneEntries ? (t.zoneGames / t.zoneEntries).toFixed(1) + 'G' : '-',
+    'ゾーン滞在率': (t.zoneGames / t.normalGames * 100).toFixed(1) + '%',
+    'BAR→CZ確定(通常時)': t.bars + '回',
+    'ATセット平均': t.atStart ? (t.atSets / t.atStart).toFixed(2) + 'セット' : '-',
+    'AT初当たり': t.atStart + '回',
+    '総ゲーム': n
+  };
+}
+if (typeof globalThis !== 'undefined') globalThis.PB = { CONFIG, newState, playGame, simulate, rebuildTables };
+
+/* ============================================================
+   画面
+   ============================================================ */
+if (typeof document !== 'undefined') {
+  const $ = id => document.getElementById(id);
+  const LINES = [[[0,0],[1,0],[2,0]],[[0,1],[1,1],[2,1]],[[0,2],[1,2],[2,2]],[[0,0],[1,1],[2,2]],[[0,2],[1,1],[2,0]]];
+  const countLines = g => { let n = 0; for (const L of LINES) { const a = g[L[0][0]][L[0][1]]; if (a && L.every(([c, r]) => g[c][r] === a)) n++; } return n; };
+  function planGrid(role) {
+    const wantLine = ['replay','bellDiag','bellSide','bar','premium','suikaStrong','runeStrong'].includes(role) ? 1 : 0;
+    let g;
+    for (let t = 0; t < 300; t++) {
+      g = [0,1,2].map(() => [null,null,null]);
+      const S = (c, r, s) => { g[c][r] = s; }, row = (r, s) => { for (let c = 0; c < 3; c++) S(c, r, s); };
+      switch (role) {
+        case 'replay': row(1, 'RP'); break;
+        case 'bellDiag': if (rnd() < .5) { S(0,0,'BELL'); S(1,1,'BELL'); S(2,2,'BELL'); } else { S(0,2,'BELL'); S(1,1,'BELL'); S(2,0,'BELL'); } break;
+        case 'bellSide': row(pick([0, 2]), 'BELL'); break;
+        case 'cherryWeak': S(0, pick([0, 2]), 'CHR'); break;
+        case 'cherryStrong': S(0,0,'CHR'); S(0,2,'CHR'); break;
+        case 'premium': row(1, 'CHR'); break;
+        case 'suikaWeak': S(0,0,'SUI'); S(1,1,'SUI'); S(2,0,'SUI'); break;
+        case 'suikaStrong': row(1, 'SUI'); break;
+        case 'runeWeak': S(0,1,'RUN'); break;
+        case 'runeMid': S(0,1,'RUN'); S(1,1,'RUN'); break;
+        case 'runeStrong': row(1, 'RUN'); break;
+        case 'bar': row(1, 'BAR'); break;
+      }
+      for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) if (!g[c][r]) g[c][r] = pick(['7', 'BELL', 'RP']);
+      if (countLines(g) === wantLine) return g;
+    }
+    return g;
+  }
+
+  let S = newState(), cur = null, stops = 0, timer = null, grid = null, disp = S.coins;
+  const cells = [];
+  for (let c = 0; c < 3; c++) {
+    const col = document.createElement('div'); col.className = 'col';
+    cells[c] = [];
+    for (let r = 0; r < 3; r++) { const d = document.createElement('div'); d.className = 'cell'; d.dataset.s = '7'; d.textContent = '7'; col.appendChild(d); cells[c][r] = d; }
+    $('reels').appendChild(col);
+  }
+  const setCell = (d, s) => { d.dataset.s = s; d.textContent = s; };
+
+  function describe(s) {
+    if (s.phase === 'normal') return s.zone > 0 ? { k: 'zone', l: '特化ゾーン', d: '残り ' + s.zone + 'G' } : { k: 'normal' + s.mode, l: '通常' + s.mode, d: '' };
+    if (s.phase === 'cz') return { k: s.cz.upper ? 'czup' : 'cz', l: (s.cz.upper ? '上位' : '') + 'CZ', d: 'STAGE ' + s.cz.g + ' / ' + CONFIG.czLen };
+    if (s.phase === 'judge') return { k: 'judge', l: 'ジャッジ', d: '引け！' };
+    if (s.phase === 'bonus') return { k: 'bonus', l: 'BONUS ' + s.bonus.type, d: '残り ' + s.bonus.left + 'G' };
+    if (s.phase === 'at') return { k: 'at', l: 'AT', d: 'SET' + s.at.sets + '  残り ' + s.at.left + 'G' };
+    return { k: 'atjudge', l: '継続ジャッジ', d: s.atj.g + ' / ' + CONFIG.at.judgeG + 'G' };
+  }
+  function dbg() {
+    const s = S; let t = `mode ${s.mode} / 周期 ${Math.round(s.cycleG)}/${s.cycleTarget} / zone ${s.zone}`;
+    if (s.cz) t += ` / CZ pass=${s.cz.pass} reward=${s.cz.reward}`;
+    $('dbg').textContent = t;
+  }
+  // ---- 演出 ----
+  let gaugeB = 50;
+  function fxState() {
+    const st = $('stage'), normal = S.phase === 'normal';
+    $('gaugeWrap').style.display = normal ? '' : 'none';
+    if (normal) {
+      // 位相ゲージ：Aは周期の進み具合そのもの、Bは意味のない揺れ（ここでモードを見抜く）
+      let v;
+      if (S.mode === 'A') v = Math.min(100, S.cycleG / S.cycleTarget * 100);
+      else { gaugeB = Math.max(0, Math.min(100, gaugeB + (Math.random() - .5) * 70)); v = gaugeB; }
+      $('gauge').firstElementChild.style.width = v + '%';
+      $('gtxt').textContent = 'PHASE ' + Math.round(v) + '%' + (v >= 95 ? '  SYNC' : '');
+    }
+    // CZの階層枠：白 < 青 < 虹（突破が決まっているほど上の枠が出やすい）
+    if (S.phase === 'cz') {
+      const w = S.cz.pass ? [50, 40, 10] : [80, 19, 1];
+      st.dataset.f = ['white', 'blue', 'rainbow'][wpick([[0, w[0]], [1, w[1]], [2, w[2]]])];
+    } else delete st.dataset.f;
+    // ジャッジ中は伏せたカード
+    const c = $('card'); c.className = S.phase === 'judge' ? 'back' : ''; c.textContent = S.phase === 'judge' ? '?' : '';
+  }
+  function makeHint() {
+    const H = CONFIG.hint;
+    if (S.nsince <= 0 || S.nsince % H.every) return null;
+    const ok = Math.random() < H.truth1 + (H.truth6 - H.truth1) * (S.setting - 1) / 5;
+    const hm = ok ? S.mode : (S.mode === 'A' ? 'B' : 'A');
+    const near = hm === 'A' && (ok ? S.cycleTarget - S.cycleG <= 100 : Math.random() < .2);
+    if (near) return '◆ 位相が重なりかけている…';
+    return pick(hm === 'A' ? ['◇ 波形は安定している', '◇ 位相は静かに整っている'] : ['◇ ノイズが混じっている', '◇ 位相が不規則に揺れている']);
+  }
+  function shatter() { const k = $('crack'); k.classList.remove('shatter'); void k.getBoundingClientRect(); k.classList.add('shatter'); setTimeout(() => k.classList.remove('shatter'), 800); }
+  function showCard(type) {
+    const c = $('card'); c.className = 'face ' + type;
+    c.textContent = type === 'REG' ? '5♣' : type === 'BIG' ? 'K♥' : 'JOKER';
+    void c.offsetWidth; c.classList.add('flip');
+  }
+  const lvText = () => S.phase === 'judge' ? 'BREAK!' : 'LEVER';
+
+  function hud(showState) {
+    $('g').textContent = 'G ' + S.st.games;
+    $('coin').textContent = 'COIN ' + disp;
+    if (showState) {
+      const d = describe(S);
+      $('ph').textContent = d.l; $('big').textContent = d.l; $('small').textContent = d.d;
+      $('stage').dataset.p = d.k;
+      fxState();
+    }
+    dbg();
+  }
+  function log(t, c) { const l = $('log'), p = document.createElement('div'); p.innerHTML = c === 'hot' ? '<b>' + t + '</b>' : c === 'sys' ? '<i>' + t + '</i>' : t; l.appendChild(p); l.scrollTop = l.scrollHeight; }
+  function flash(k) { const f = $('flash'); f.className = ''; void f.offsetWidth; f.className = k; }
+  function leverFx(role) {
+    const big = $('big'), small = $('small');
+    if (role === 'premium') { flash('p'); big.textContent = 'SYSTEM DOWN'; small.textContent = ''; }
+    else if (role === 'bar') { flash('b'); big.textContent = 'WARNING'; small.textContent = ''; }
+    else if (/Strong$|Mid$/.test(role)) { flash('s'); big.textContent = 'PHASE BREAK!'; small.textContent = ''; }
+    else if (RARE.has(role)) { flash('w'); big.textContent = '…？'; small.textContent = ''; }
+  }
+
+  $('btn').addEventListener('click', () => {
+    if (!cur) {
+      if (disp < CONFIG.bet) { disp += 1000; S.coins += 1000; log('コインを1000枚補充しました', 'sys'); }
+      cur = playGame(S); stops = 0; grid = planGrid(cur.role); disp -= CONFIG.bet;
+      $('pay').textContent = '';
+      for (let c = 0; c < 3; c++) for (let r = 0; r < 3; r++) cells[c][r].className = 'cell spin';
+      timer = setInterval(() => {
+        for (let c = stops; c < 3; c++) for (let r = 0; r < 3; r++) setCell(cells[c][r], pick(['7','BAR','RP','BELL','CHR','SUI','RUN']));
+      }, 70);
+      $('hint').textContent = ''; $('card').className = '';
+      leverFx(cur.role);
+      if (cur.phaseBefore === 'judge') { flash('s'); $('big').textContent = 'BREAK!!'; }
+      $('btn').textContent = 'STOP 1/3'; $('g').textContent = 'G ' + S.st.games; $('coin').textContent = 'COIN ' + disp;
+      return;
+    }
+    const c = stops;
+    for (let r = 0; r < 3; r++) { setCell(cells[c][r], grid[c][r]); cells[c][r].className = 'cell' + (['RUN','CHR','SUI','BAR'].includes(grid[c][r]) ? ' hit' : ''); }
+    stops++;
+    if (stops < 3) { $('btn').textContent = 'STOP ' + (stops + 1) + '/3'; return; }
+    clearInterval(timer);
+    disp += cur.pay;
+    $('pay').textContent = cur.pay > 0 ? (cur.role === 'replay' ? 'REPLAY' : 'WIN +' + cur.pay) : '';
+    log('G' + S.st.games + ' ' + LABEL[cur.role] + (cur.pay ? ' (' + cur.pay + '枚)' : ''));
+    for (const e of cur.ev) log('　' + e.t, e.c);
+    const was = cur; cur = null; hud(true);
+    if (was.phaseBefore === 'judge') { shatter(); showCard(S.phase === 'bonus' ? S.bonus.type : 'AT'); }
+    else if (was.phaseBefore === 'normal') { const h = makeHint(); if (h) $('hint').textContent = h; }
+    $('btn').textContent = lvText();
+  });
+  $('setting').addEventListener('change', () => { $('reset').click(); });
+  $('reset').addEventListener('click', () => {
+    clearInterval(timer); cur = null; S = newState(+$('setting').value); disp = S.coins; $('log').innerHTML = '';
+    $('btn').textContent = 'LEVER'; $('pay').textContent = ''; hud(true);
+  });
+  $('sim').addEventListener('click', () => {
+    const out = $('simout'); out.textContent = '計算中…';
+    setTimeout(() => {
+      const st = +$('setting').value; const r = simulate(1000000, st);
+      out.textContent = '設定' + st + ' / 100万G\n' + Object.entries(r).map(([k, v]) => k + '：' + v).join('\n');
+    }, 30);
+  });
+  hud(true);
+}
+</script>
+</body>
+</html>
